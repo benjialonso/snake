@@ -7,33 +7,39 @@ interface Position {
   y: number;
 }
 
+// Aumentamos el GRID_SIZE para un campo de juego más grande,
+// pero mantenemos CELL_SIZE en 20 para que la serpiente siga siendo pequeña.
 const GRID_SIZE = 30;
-const CELL_SIZE = 25;
-const BOARD_WIDTH = GRID_SIZE * CELL_SIZE;
-const BOARD_HEIGHT = GRID_SIZE * CELL_SIZE;
-const MAX_FOOD_ATTEMPTS = 100;
+const CELL_SIZE = 20;
+const BOARD_WIDTH = GRID_SIZE * CELL_SIZE; // 600px
+const BOARD_HEIGHT = GRID_SIZE * CELL_SIZE; // 600px
+const MAX_FOOD_ATTEMPTS = 150;
 
 const INITIAL_SNAKE: Position[] = [
   { x: Math.floor(GRID_SIZE / 2), y: Math.floor(GRID_SIZE / 2) },
 ];
 const INITIAL_DIRECTION: Direction = "RIGHT";
 
-const SCORE_PER_LEVEL = 5;
-const MAX_LEVEL = 10;
-const BASE_SPEED = 200;
-const SPEED_DECREMENT = 15;
+const BASE_SPEED = 100;
+
+function generateRandomPosition(): Position {
+  return {
+    x: Math.floor(Math.random() * GRID_SIZE),
+    y: Math.floor(Math.random() * GRID_SIZE),
+  };
+}
 
 const ClassicSnakeGame: React.FC = () => {
   const [snake, setSnake] = useState<Position[]>(INITIAL_SNAKE);
   const [food, setFood] = useState<Position>(generateRandomPosition());
   const [direction, setDirection] = useState<Direction>(INITIAL_DIRECTION);
   const [gameOver, setGameOver] = useState<boolean>(false);
-  const [level, setLevel] = useState<number>(1);
   const [intervalDelay, setIntervalDelay] = useState<number>(BASE_SPEED);
   const [scale, setScale] = useState<number>(1);
 
   const directionRef = useRef<Direction>(direction);
   const queuedDirectionRef = useRef<Direction | null>(null);
+  const mainRef = useRef<HTMLDivElement>(null);
 
   const score = snake.length - 1;
 
@@ -41,20 +47,18 @@ const ClassicSnakeGame: React.FC = () => {
     directionRef.current = direction;
   }, [direction]);
 
-  function generateRandomPosition(): Position {
-    return {
-      x: Math.floor(Math.random() * GRID_SIZE),
-      y: Math.floor(Math.random() * GRID_SIZE),
-    };
-  }
-
-  const checkCollision = (pos: Position, snakeSegments: Position[]): boolean => {
+  const checkCollision = (
+    pos: Position,
+    snakeSegments: Position[]
+  ): boolean => {
     return (
       pos.x < 0 ||
       pos.x >= GRID_SIZE ||
       pos.y < 0 ||
       pos.y >= GRID_SIZE ||
-      snakeSegments.some((segment) => segment.x === pos.x && segment.y === pos.y)
+      snakeSegments.some(
+        (segment) => segment.x === pos.x && segment.y === pos.y
+      )
     );
   };
 
@@ -124,7 +128,9 @@ const ClassicSnakeGame: React.FC = () => {
     let attempts = 0;
 
     while (
-      newSnake.some(segment => segment.x === newFood.x && segment.y === newFood.y) &&
+      newSnake.some(
+        (segment) => segment.x === newFood.x && segment.y === newFood.y
+      ) &&
       attempts < MAX_FOOD_ATTEMPTS
     ) {
       newFood = generateRandomPosition();
@@ -142,30 +148,15 @@ const ClassicSnakeGame: React.FC = () => {
     queuedDirectionRef.current = null;
     setGameOver(false);
     setFood(newFood);
-    setLevel(1);
     setIntervalDelay(BASE_SPEED);
   };
-
-  const calculateLevel = (score: number): number =>
-    Math.min(MAX_LEVEL, Math.floor(score / SCORE_PER_LEVEL) + 1);
-
-  const calculateSpeed = (level: number): number =>
-    Math.max(50, BASE_SPEED - (level - 1) * SPEED_DECREMENT);
-
-  useEffect(() => {
-    const newLevel = calculateLevel(score);
-    if (newLevel !== level) {
-      setLevel(newLevel);
-      setIntervalDelay(calculateSpeed(newLevel));
-    }
-  }, [score, level]);
 
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
       if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
         e.preventDefault();
       }
-      
+
       const currentDirection = directionRef.current;
       let newDirection: Direction | null = null;
 
@@ -199,16 +190,19 @@ const ClassicSnakeGame: React.FC = () => {
     return () => clearInterval(gameLoop);
   }, [moveSnake, intervalDelay, gameOver]);
 
+  // Recalcula la escala en base al tamaño del contenedor "main"
   useEffect(() => {
     const updateScale = () => {
-      const availableWidth = window.innerWidth * 0.9;
-      const availableHeight = window.innerHeight * 0.9;
-      const newScale = Math.min(
-        availableWidth / BOARD_WIDTH,
-        availableHeight / BOARD_HEIGHT,
-        1
-      );
-      setScale(newScale);
+      if (mainRef.current) {
+        const availableWidth = mainRef.current.clientWidth;
+        const availableHeight = mainRef.current.clientHeight;
+        const newScale = Math.min(
+          availableWidth / BOARD_WIDTH,
+          availableHeight / BOARD_HEIGHT,
+          1 // Limita la escala a 1 para que no se agrande en pantallas grandes
+        );
+        setScale(newScale);
+      }
     };
 
     updateScale();
@@ -217,25 +211,51 @@ const ClassicSnakeGame: React.FC = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center justify-center font-mono p-4 overflow-hidden">
-      <h1 className="text-4xl mb-4 font-bold text-green-400 drop-shadow-md">
-        Classic Snake Game
-      </h1>
+    <div className="h-screen bg-gray-900 text-white font-mono overflow-hidden flex flex-col">
+      {/* Header */}
+      <header className="flex justify-center h-12 items-center">
+        <h1 className="text-xl md:text-2xl font-bold text-green-400 drop-shadow-md">
+          Snakey
+        </h1>
+      </header>
 
-      <div className="w-full flex justify-center mb-4">
-        <div style={{ transform: `scale(${scale})`, transformOrigin: "top center" }}>
-          <div style={{ backgroundColor: "#48bb78", padding: "4px", display: "inline-block" }}>
-            <div className="relative bg-gray-800 overflow-hidden" 
-                 style={{ width: `${BOARD_WIDTH}px`, height: `${BOARD_HEIGHT}px` }}>
+      {/* Main container: aquí se mide el espacio disponible */}
+      <main
+        ref={mainRef}
+        className="flex-grow flex items-center justify-center"
+      >
+        <div
+          style={{
+            transform: `scale(${scale})`,
+            transformOrigin: "center center",
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: "#48bb78",
+              padding: "4px",
+              display: "inline-block",
+            }}
+          >
+            <div
+              className="relative bg-gray-800 overflow-hidden"
+              style={{ width: `${BOARD_WIDTH}px`, height: `${BOARD_HEIGHT}px` }}
+            >
               {snake.map((segment, index) => (
-                <SnakeSegment key={`snake-${index}`} x={segment.x} y={segment.y} />
+                <SnakeSegment
+                  key={`snake-${index}`}
+                  x={segment.x}
+                  y={segment.y}
+                />
               ))}
 
               <Food x={food.x} y={food.y} />
 
               {gameOver && (
                 <div className="absolute inset-0 bg-black bg-opacity-75 flex flex-col items-center justify-center">
-                  <p className="text-3xl font-bold text-red-500 mb-4">¡Game Over!</p>
+                  <p className="text-3xl font-bold text-red-500 mb-4">
+                    ¡Game Over!
+                  </p>
                   <button
                     onClick={resetGame}
                     className="bg-green-500 text-white px-6 py-2 rounded hover:bg-green-600 transition-colors"
@@ -247,13 +267,16 @@ const ClassicSnakeGame: React.FC = () => {
             </div>
           </div>
         </div>
-      </div>
+      </main>
 
-      <div className="flex flex-col md:flex-row gap-4 text-lg">
-        <div>Score: <span className="font-bold text-green-400">{score}</span></div>
-        <div>Level: <span className="font-bold text-green-400">{level}</span></div>
-        <div>Speed: <span className="font-bold text-green-400">{intervalDelay}ms</span></div>
-      </div>
+      {/* Footer */}
+      <footer className="flex justify-center h-12 items-center">
+        <div className="flex flex-col md:flex-row gap-4 text-xs md:text-base">
+          <div>
+            Score: <span className="font-bold text-green-400">{score}</span>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 };
